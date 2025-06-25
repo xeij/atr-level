@@ -1,4 +1,4 @@
-# ATR Level Indicator
+# Xeijs ATR Level Indicator
 
 A comprehensive ATR (Average True Range) Level Indicator for both TradingView and Thinkorswim platforms. This indicator creates dynamic support and resistance levels based on the Average True Range and a moving average.
 
