@@ -1,4 +1,4 @@
-# Xeijs ATR Level Indicator
+# ATR Level Indicator
 
 A comprehensive ATR (Average True Range) Level Indicator for both TradingView and Thinkorswim platforms. This indicator creates dynamic support and resistance levels based on the Average True Range and a moving average.
 
@@ -21,6 +21,22 @@ A comprehensive ATR (Average True Range) Level Indicator for both TradingView an
 - Price crossing above/below ATR levels
 - Customizable alert messages
 - Audio alerts (ThinkScript)
+
+## Installation
+
+### TradingView (PineScript)
+1. Open TradingView and go to the Pine Editor
+2. Copy the contents of `atr_level_indicator.pine`
+3. Paste it into the Pine Editor
+4. Click "Add to Chart"
+5. Configure the settings as desired
+
+### Thinkorswim (ThinkScript)
+1. Open Thinkorswim
+2. Go to Studies → Create Study
+3. Copy the contents of `atr_level_indicator.ts`
+4. Paste it into the ThinkScript editor
+5. Save and apply to your chart
 
 ## Configuration Options
 
