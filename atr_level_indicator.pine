@@ -5,7 +5,8 @@ indicator('Xeijs ATR Level Indicator', shorttitle = 'Xeijs ATR', overlay = true)
 
 // Input Parameters
 atr_length = input.int(14, title = 'ATR Length', minval = 1)
-ma_type = input.string('SMA', title = 'Moving Average Type', options = ['SMA', 'EMA', 'WMA', 'RMA'])
+reference_point = input.string('Daily Open', title = 'Reference Point', options = ['Daily Open', 'Previous Close', 'Session High/Low', 'Current Open'])
+ma_type = input.string('SMA', title = 'Moving Average Type (for display only)', options = ['SMA', 'EMA', 'WMA', 'RMA'])
 ma_length = input.int(20, title = 'Moving Average Length', minval = 1)
 
 // ATR Multipliers for different levels
@@ -33,37 +34,54 @@ lower_color_4 = input.color(color.new(color.green, 10), title = 'Lower Level 4 C
 // Calculate ATR
 atr = ta.atr(atr_length)
 
-// Calculate Moving Average
+// Get reference point for horizontal levels
+var float reference_level = na
+var float daily_atr = na
+
+// Calculate reference point based on user selection
+if barstate.isfirst or (timeframe.change('1D') and barstate.isconfirmed)
+    daily_atr := ta.atr(atr_length)[1]  // Use previous bar's ATR to avoid repainting
+    reference_level := switch reference_point
+        'Daily Open' => open
+        'Previous Close' => close[1]
+        'Session High/Low' => (ta.highest(high, 20) + ta.lowest(low, 20)) / 2
+        'Current Open' => open
+        => open
+
+// Calculate Horizontal ATR Levels from reference point
+upper_1 = reference_level + daily_atr * atr_mult_1
+upper_2 = reference_level + daily_atr * atr_mult_2
+upper_3 = reference_level + daily_atr * atr_mult_3
+upper_4 = reference_level + daily_atr * atr_mult_4
+
+lower_1 = reference_level - daily_atr * atr_mult_1
+lower_2 = reference_level - daily_atr * atr_mult_2
+lower_3 = reference_level - daily_atr * atr_mult_3
+lower_4 = reference_level - daily_atr * atr_mult_4
+
+// Calculate Moving Average (for reference only)
 ma = switch ma_type
     'SMA' => ta.sma(close, ma_length)
     'EMA' => ta.ema(close, ma_length)
     'WMA' => ta.wma(close, ma_length)
     'RMA' => ta.rma(close, ma_length)
 
-// Calculate ATR Levels
-upper_1 = ma + atr * atr_mult_1
-upper_2 = ma + atr * atr_mult_2
-upper_3 = ma + atr * atr_mult_3
-upper_4 = ma + atr * atr_mult_4
-
-lower_1 = ma - atr * atr_mult_1
-lower_2 = ma - atr * atr_mult_2
-lower_3 = ma - atr * atr_mult_3
-lower_4 = ma - atr * atr_mult_4
-
 // Plot Moving Average
 plot(show_ma ? ma : na, title = 'Moving Average', color = ma_color, linewidth = 2)
 
-// Plot ATR Levels
-plot(show_levels ? upper_1 : na, title = 'Upper ATR 1', color = upper_color_1, linewidth = 1)
-plot(show_levels ? upper_2 : na, title = 'Upper ATR 2', color = upper_color_2, linewidth = 1)
-plot(show_levels ? upper_3 : na, title = 'Upper ATR 3', color = upper_color_3, linewidth = 1)
-plot(show_levels ? upper_4 : na, title = 'Upper ATR 4', color = upper_color_4, linewidth = 1)
+// Plot Horizontal ATR Levels
+plot(show_levels ? upper_1 : na, title = 'Resistance 1', color = upper_color_1, linewidth = 2, style = plot.style_line)
+plot(show_levels ? upper_2 : na, title = 'Resistance 2', color = upper_color_2, linewidth = 2, style = plot.style_line)
+plot(show_levels ? upper_3 : na, title = 'Resistance 3', color = upper_color_3, linewidth = 2, style = plot.style_line)
+plot(show_levels ? upper_4 : na, title = 'Resistance 4', color = upper_color_4, linewidth = 2, style = plot.style_line)
 
-plot(show_levels ? lower_1 : na, title = 'Lower ATR 1', color = lower_color_1, linewidth = 1)
-plot(show_levels ? lower_2 : na, title = 'Lower ATR 2', color = lower_color_2, linewidth = 1)
-plot(show_levels ? lower_3 : na, title = 'Lower ATR 3', color = lower_color_3, linewidth = 1)
-plot(show_levels ? lower_4 : na, title = 'Lower ATR 4', color = lower_color_4, linewidth = 1)
+plot(show_levels ? lower_1 : na, title = 'Support 1', color = lower_color_1, linewidth = 2, style = plot.style_line)
+plot(show_levels ? lower_2 : na, title = 'Support 2', color = lower_color_2, linewidth = 2, style = plot.style_line)
+plot(show_levels ? lower_3 : na, title = 'Support 3', color = lower_color_3, linewidth = 2, style = plot.style_line)
+plot(show_levels ? lower_4 : na, title = 'Support 4', color = lower_color_4, linewidth = 2, style = plot.style_line)
+
+// Plot reference level
+plot(show_levels ? reference_level : na, title = 'Reference Level', color = color.new(color.gray, 50), linewidth = 1, style = plot.style_circles)
 
 // Add labels for the most recent bar
 if show_labels and barstate.islast
@@ -109,19 +127,21 @@ volatility_color = atr > atr_avg ? color.red : color.green
 
 // Table to display current ATR value and levels
 if barstate.islast and input.bool(true, title = 'Show ATR Info Table')
-    var table info_table = table.new(position.top_right, 2, 6, bgcolor = color.white, border_width = 1)
+    var table info_table = table.new(position.top_right, 2, 7, bgcolor = color.white, border_width = 1)
     table.cell(info_table, 0, 0, 'ATR Info', text_color = color.black, bgcolor = color.gray)
     table.cell(info_table, 1, 0, '', text_color = color.black, bgcolor = color.gray)
     table.cell(info_table, 0, 1, 'ATR Value', text_color = color.black)
-    table.cell(info_table, 1, 1, str.tostring(atr, '#.##'), text_color = color.black)
+    table.cell(info_table, 1, 1, str.tostring(daily_atr, '#.##'), text_color = color.black)
     table.cell(info_table, 0, 2, 'ATR %', text_color = color.black)
-    table.cell(info_table, 1, 2, str.tostring(atr / close * 100, '#.##') + '%', text_color = color.black)
-    table.cell(info_table, 0, 3, 'Current Price', text_color = color.black)
-    table.cell(info_table, 1, 3, str.tostring(close, '#.##'), text_color = color.black)
-    table.cell(info_table, 0, 4, 'MA Value', text_color = color.black)
-    table.cell(info_table, 1, 4, str.tostring(ma, '#.##'), text_color = color.black)
-    table.cell(info_table, 0, 5, 'Volatility', text_color = color.black)
-    table.cell(info_table, 1, 5, volatility_state, text_color = volatility_color)
+    table.cell(info_table, 1, 2, str.tostring(daily_atr / close * 100, '#.##') + '%', text_color = color.black)
+    table.cell(info_table, 0, 3, 'Reference Level', text_color = color.black)
+    table.cell(info_table, 1, 3, str.tostring(reference_level, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 4, 'Current Price', text_color = color.black)
+    table.cell(info_table, 1, 4, str.tostring(close, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 5, 'MA Value', text_color = color.black)
+    table.cell(info_table, 1, 5, str.tostring(ma, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 6, 'Volatility', text_color = color.black)
+    table.cell(info_table, 1, 6, volatility_state, text_color = volatility_color)
 
 // Alert conditions
 alertcondition(ta.crossover(close, upper_1), title = 'Price Above ATR Upper 1', message = 'Price crossed above ATR Upper Level 1')
