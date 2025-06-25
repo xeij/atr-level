@@ -1,4 +1,5 @@
-# ATR Level Indicator for Thinkorswim
+# Xeijs ATR Level Indicator for Thinkorswim
+# Copyright (C) 2025 Shaya Arya
 # Advanced ATR-based Support and Resistance Levels
 
 declare upper;
