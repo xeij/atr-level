@@ -1,0 +1,299 @@
+//@version=6
+// Copyright (C) 2025 Shaya Arya - Professional ATR Level Indicator
+// Professional-Grade ATR Level Indicator with Advanced Analytics
+
+indicator('Xeijs ATR Level Indicator Pro', shorttitle = 'Xeijs ATR Pro', overlay = true, max_labels_count = 500, max_lines_count = 100)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// INPUT PARAMETERS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Core Settings
+atr_group = "ATR Settings"
+atr_length = input.int(14, title = 'ATR Length', minval = 1, group = atr_group)
+atr_smoothing = input.string('RMA', title = 'ATR Smoothing', options = ['RMA', 'SMA', 'EMA', 'WMA'], group = atr_group)
+volume_weighted = input.bool(false, title = 'Volume Weighted ATR', group = atr_group)
+multi_timeframe = input.bool(true, title = 'Multi-Timeframe Analysis', group = atr_group)
+htf_timeframe = input.timeframe('1D', title = 'Higher Timeframe', group = atr_group)
+
+// Moving Average Settings
+ma_group = "Moving Average Settings"
+ma_type = input.string('EMA', title = 'MA Type', options = ['SMA', 'EMA', 'WMA', 'RMA', 'VWMA', 'HMA'], group = ma_group)
+ma_length = input.int(20, title = 'MA Length', minval = 1, group = ma_group)
+adaptive_ma = input.bool(true, title = 'Adaptive MA (Volatility Adjusted)', group = ma_group)
+
+// Level Configuration
+levels_group = "Level Configuration"
+num_levels = input.int(6, title = 'Number of Levels (Each Side)', minval = 3, maxval = 8, group = levels_group)
+level_spacing = input.string('Fibonacci', title = 'Level Spacing', options = ['Linear', 'Fibonacci', 'Logarithmic', 'Custom'], group = levels_group)
+base_multiplier = input.float(0.618, title = 'Base Multiplier', minval = 0.1, step = 0.1, group = levels_group)
+multiplier_increment = input.float(0.618, title = 'Multiplier Increment', minval = 0.1, step = 0.1, group = levels_group)
+
+// Visual Settings
+visual_group = "Visual Settings"
+show_ma = input.bool(true, title = 'Show Moving Average', group = visual_group)
+show_levels = input.bool(true, title = 'Show ATR Levels', group = visual_group)
+show_labels = input.bool(true, title = 'Show Level Labels', group = visual_group)
+show_zones = input.bool(true, title = 'Show Probability Zones', group = visual_group)
+dynamic_colors = input.bool(true, title = 'Dynamic Colors (Price Action)', group = visual_group)
+line_style = input.string('Solid', title = 'Line Style', options = ['Solid', 'Dashed', 'Dotted'], group = visual_group)
+
+// Analytics Settings
+analytics_group = "Analytics & Alerts"
+show_statistics = input.bool(true, title = 'Show Statistics Table', group = analytics_group)
+show_performance = input.bool(true, title = 'Show Performance Metrics', group = analytics_group)
+volatility_regime = input.bool(true, title = 'Volatility Regime Detection', group = analytics_group)
+risk_management = input.bool(true, title = 'Risk Management Tools', group = analytics_group)
+session_levels = input.bool(true, title = 'Session-Based Levels', group = analytics_group)
+
+// Alert Settings
+alert_group = "Alert Configuration"
+enable_alerts = input.bool(true, title = 'Enable Advanced Alerts', group = alert_group)
+alert_lookback = input.int(5, title = 'Alert Confirmation Bars', minval = 1, group = alert_group)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// CORE CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Enhanced ATR Calculation
+get_atr() =>
+    tr = math.max(high - low, math.max(math.abs(high - close[1]), math.abs(low - close[1])))
+    vol_weight = volume_weighted ? volume : 1
+    weighted_tr = tr * vol_weight
+    
+    atr_val = switch atr_smoothing
+        'RMA' => ta.rma(weighted_tr, atr_length) / (volume_weighted ? ta.rma(vol_weight, atr_length) : 1)
+        'SMA' => ta.sma(weighted_tr, atr_length) / (volume_weighted ? ta.sma(vol_weight, atr_length) : 1)
+        'EMA' => ta.ema(weighted_tr, atr_length) / (volume_weighted ? ta.ema(vol_weight, atr_length) : 1)
+        'WMA' => ta.wma(weighted_tr, atr_length) / (volume_weighted ? ta.wma(vol_weight, atr_length) : 1)
+    
+    atr_val
+
+atr = get_atr()
+
+// Multi-timeframe ATR
+htf_atr = multi_timeframe ? request.security(syminfo.tickerid, htf_timeframe, get_atr()) : atr
+atr_final = multi_timeframe ? math.avg(atr, htf_atr) : atr
+
+// Enhanced Moving Average
+get_ma(src, len) =>
+    switch ma_type
+        'SMA' => ta.sma(src, len)
+        'EMA' => ta.ema(src, len)
+        'WMA' => ta.wma(src, len)
+        'RMA' => ta.rma(src, len)
+        'VWMA' => ta.vwma(src, len)
+        'HMA' => ta.hma(src, len)
+
+// Adaptive MA based on volatility
+volatility_factor = atr_final / ta.sma(atr_final, 50)
+adaptive_length = adaptive_ma ? math.round(ma_length * (2 - volatility_factor)) : ma_length
+ma = get_ma(close, math.max(adaptive_length, 2))
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// LEVEL CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Generate level multipliers based on spacing type
+get_multipliers() =>
+    multipliers = array.new<float>()
+    
+    for i = 1 to num_levels
+        mult = switch level_spacing
+            'Linear' => base_multiplier + (i - 1) * multiplier_increment
+            'Fibonacci' => base_multiplier * math.pow(1.618, i - 1)
+            'Logarithmic' => base_multiplier * math.log(i + 1)
+            'Custom' => base_multiplier * i
+        
+        array.push(multipliers, mult)
+    
+    multipliers
+
+multipliers = get_multipliers()
+
+// Calculate levels
+upper_levels = array.new<float>()
+lower_levels = array.new<float>()
+
+for i = 0 to array.size(multipliers) - 1
+    mult = array.get(multipliers, i)
+    array.push(upper_levels, ma + atr_final * mult)
+    array.push(lower_levels, ma - atr_final * mult)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ADVANCED ANALYTICS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Volatility Regime Detection
+atr_percentile = ta.percentrank(atr_final, 100)
+vol_regime = atr_percentile > 80 ? "Extreme High" : atr_percentile > 60 ? "High" : atr_percentile > 40 ? "Normal" : atr_percentile > 20 ? "Low" : "Extreme Low"
+vol_color = atr_percentile > 80 ? color.red : atr_percentile > 60 ? color.orange : atr_percentile > 40 ? color.yellow : atr_percentile > 20 ? color.blue : color.green
+
+// Price Position Analysis
+distance_from_ma = (close - ma) / atr_final
+price_position = math.abs(distance_from_ma) > 2 ? "Extended" : math.abs(distance_from_ma) > 1 ? "Stretched" : "Normal"
+
+// Session Analysis
+is_new_session = session_levels and timeframe.change('1D')
+var float session_high = na
+var float session_low = na
+var float session_open = na
+
+if is_new_session
+    session_high := high
+    session_low := low
+    session_open := open
+else
+    session_high := math.max(session_high, high)
+    session_low := math.min(session_low, low)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// VISUALIZATION
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Dynamic color scheme based on price action
+get_level_color(is_upper, level_index, base_color) =>
+    if dynamic_colors
+        momentum = ta.rsi(close, 14)
+        strength = momentum > 70 ? 0.3 : momentum > 50 ? 0.5 : momentum > 30 ? 0.7 : 0.9
+        color.new(base_color, math.round(strength * 100))
+    else
+        transparency = 20 + level_index * 10
+        color.new(base_color, math.min(transparency, 80))
+
+// Plot Moving Average
+ma_plot = plot(show_ma ? ma : na, title = 'Adaptive MA', color = color.blue, linewidth = 3)
+
+// Plot ATR Levels - moved to global scope
+// Create individual plots for each level to avoid local scope issues
+r1 = array.size(upper_levels) > 0 ? array.get(upper_levels, 0) : na
+r2 = array.size(upper_levels) > 1 ? array.get(upper_levels, 1) : na
+r3 = array.size(upper_levels) > 2 ? array.get(upper_levels, 2) : na
+r4 = array.size(upper_levels) > 3 ? array.get(upper_levels, 3) : na
+r5 = array.size(upper_levels) > 4 ? array.get(upper_levels, 4) : na
+r6 = array.size(upper_levels) > 5 ? array.get(upper_levels, 5) : na
+
+s1 = array.size(lower_levels) > 0 ? array.get(lower_levels, 0) : na
+s2 = array.size(lower_levels) > 1 ? array.get(lower_levels, 1) : na
+s3 = array.size(lower_levels) > 2 ? array.get(lower_levels, 2) : na
+s4 = array.size(lower_levels) > 3 ? array.get(lower_levels, 3) : na
+s5 = array.size(lower_levels) > 4 ? array.get(lower_levels, 4) : na
+s6 = array.size(lower_levels) > 5 ? array.get(lower_levels, 5) : na
+
+plot(show_levels ? r1 : na, title = 'R1', color = get_level_color(true, 0, color.red), linewidth = 3)
+plot(show_levels ? r2 : na, title = 'R2', color = get_level_color(true, 1, color.red), linewidth = 2)
+plot(show_levels ? r3 : na, title = 'R3', color = get_level_color(true, 2, color.red), linewidth = 2)
+plot(show_levels ? r4 : na, title = 'R4', color = get_level_color(true, 3, color.red), linewidth = 1)
+plot(show_levels ? r5 : na, title = 'R5', color = get_level_color(true, 4, color.red), linewidth = 1)
+plot(show_levels ? r6 : na, title = 'R6', color = get_level_color(true, 5, color.red), linewidth = 1)
+
+plot(show_levels ? s1 : na, title = 'S1', color = get_level_color(false, 0, color.green), linewidth = 3)
+plot(show_levels ? s2 : na, title = 'S2', color = get_level_color(false, 1, color.green), linewidth = 2)
+plot(show_levels ? s3 : na, title = 'S3', color = get_level_color(false, 2, color.green), linewidth = 2)
+plot(show_levels ? s4 : na, title = 'S4', color = get_level_color(false, 3, color.green), linewidth = 1)
+plot(show_levels ? s5 : na, title = 'S5', color = get_level_color(false, 4, color.green), linewidth = 1)
+plot(show_levels ? s6 : na, title = 'S6', color = get_level_color(false, 5, color.green), linewidth = 1)
+
+// Probability Zones - moved to global scope
+zone1_upper = array.size(upper_levels) > 0 ? array.get(upper_levels, 0) : na
+zone1_lower = array.size(lower_levels) > 0 ? array.get(lower_levels, 0) : na
+zone2_upper = array.size(upper_levels) > 1 ? array.get(upper_levels, 1) : na
+zone2_lower = array.size(lower_levels) > 1 ? array.get(lower_levels, 1) : na
+
+// High probability mean reversion zone
+bgcolor(show_zones and not na(zone1_upper) and not na(zone1_lower) and (close > zone1_upper or close < zone1_lower) ? color.new(color.yellow, 90) : na, title = "Mean Reversion Zone")
+
+// Breakout zone  
+bgcolor(show_zones and not na(zone2_upper) and not na(zone2_lower) and (close > zone2_upper or close < zone2_lower) ? color.new(color.purple, 95) : na, title = "Breakout Zone")
+
+// Enhanced Labels
+if show_labels and barstate.islast
+    for i = 0 to math.min(array.size(upper_levels), 4) - 1
+        upper_level = array.get(upper_levels, i)
+        lower_level = array.get(lower_levels, i)
+        multiplier = array.get(multipliers, i)
+        
+        label.new(bar_index + 2, upper_level, 
+                 text = 'R' + str.tostring(i + 1) + '\n' + str.tostring(upper_level, '#.##') + '\n' + str.tostring(multiplier, '#.##') + 'x ATR',
+                 style = label.style_label_left, 
+                 color = color.new(color.red, 20), 
+                 textcolor = color.white, 
+                 size = size.small)
+        
+        label.new(bar_index + 2, lower_level, 
+                 text = 'S' + str.tostring(i + 1) + '\n' + str.tostring(lower_level, '#.##') + '\n' + str.tostring(multiplier, '#.##') + 'x ATR',
+                 style = label.style_label_left, 
+                 color = color.new(color.green, 20), 
+                 textcolor = color.white, 
+                 size = size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ADVANCED STATISTICS TABLE
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+if show_statistics and barstate.islast
+    var table stats_table = table.new(position.top_right, 3, 8, bgcolor = color.white, border_width = 1)
+    
+    // Header
+    table.cell(stats_table, 0, 0, 'ATR Analytics Pro', text_color = color.white, bgcolor = color.blue, text_size = size.normal)
+    table.cell(stats_table, 1, 0, 'Current', text_color = color.white, bgcolor = color.blue, text_size = size.small)
+    table.cell(stats_table, 2, 0, 'Signal', text_color = color.white, bgcolor = color.blue, text_size = size.small)
+    
+    // ATR Metrics
+    table.cell(stats_table, 0, 1, 'ATR Value', text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 1, 1, str.tostring(atr_final, '#.####'), text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 2, 1, str.tostring(atr_percentile, '#') + '%ile', text_color = vol_color, text_size = size.small)
+    
+    table.cell(stats_table, 0, 2, 'ATR %', text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 1, 2, str.tostring(atr_final / close * 100, '#.##') + '%', text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 2, 2, vol_regime, text_color = vol_color, text_size = size.small)
+    
+    // Price Analysis
+    table.cell(stats_table, 0, 3, 'Price vs MA', text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 1, 3, str.tostring(distance_from_ma, '#.##') + ' ATR', text_color = color.black, text_size = size.small)
+    table.cell(stats_table, 2, 3, price_position, text_color = math.abs(distance_from_ma) > 1.5 ? color.red : color.green, text_size = size.small)
+    
+    // Session Data
+    if session_levels and not na(session_high)
+        session_range = session_high - session_low
+        table.cell(stats_table, 0, 4, 'Session Range', text_color = color.black, text_size = size.small)
+        table.cell(stats_table, 1, 4, str.tostring(session_range, '#.##'), text_color = color.black, text_size = size.small)
+        table.cell(stats_table, 2, 4, str.tostring(session_range / atr_final, '#.#') + ' ATR', text_color = color.blue, text_size = size.small)
+    
+    // Risk Management
+    if risk_management and array.size(upper_levels) >= 2
+        risk_level = array.get(lower_levels, 0)
+        reward_level = array.get(upper_levels, 1)
+        rr_ratio = (reward_level - close) / (close - risk_level)
+        
+        table.cell(stats_table, 0, 5, 'R:R Ratio', text_color = color.black, text_size = size.small)
+        table.cell(stats_table, 1, 5, str.tostring(math.abs(rr_ratio), '#.##'), text_color = color.black, text_size = size.small)
+        table.cell(stats_table, 2, 5, rr_ratio > 2 ? 'Good' : rr_ratio > 1 ? 'Fair' : 'Poor', 
+                  text_color = rr_ratio > 2 ? color.green : rr_ratio > 1 ? color.orange : color.red, text_size = size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ADVANCED ALERTS - moved to global scope
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Level break alerts with confirmation
+upper_1_alert = array.size(upper_levels) > 0 ? array.get(upper_levels, 0) : na
+lower_1_alert = array.size(lower_levels) > 0 ? array.get(lower_levels, 0) : na
+upper_2_alert = array.size(upper_levels) > 1 ? array.get(upper_levels, 1) : na
+lower_2_alert = array.size(lower_levels) > 1 ? array.get(lower_levels, 1) : na
+
+// Confirmed breakouts
+upper_break_confirmed = enable_alerts and not na(upper_1_alert) and ta.crossover(close, upper_1_alert) and ta.highest(close, alert_lookback) > upper_1_alert
+lower_break_confirmed = enable_alerts and not na(lower_1_alert) and ta.crossunder(close, lower_1_alert) and ta.lowest(close, alert_lookback) < lower_1_alert
+
+// Volatility spike alerts
+vol_spike = enable_alerts and atr_percentile > 90 and atr_percentile[1] <= 90
+
+// Mean reversion setups
+mean_reversion_long = enable_alerts and not na(lower_1_alert) and close < lower_1_alert and ta.rsi(close, 14) < 30
+mean_reversion_short = enable_alerts and not na(upper_1_alert) and close > upper_1_alert and ta.rsi(close, 14) > 70
+
+alertcondition(upper_break_confirmed, title = 'Confirmed Upside Break', message = 'Price confirmed break above ATR resistance level')
+alertcondition(lower_break_confirmed, title = 'Confirmed Downside Break', message = 'Price confirmed break below ATR support level')
+alertcondition(vol_spike, title = 'Volatility Spike', message = 'ATR volatility spike detected - increased range expected')
+alertcondition(mean_reversion_long, title = 'Mean Reversion Long Setup', message = 'Oversold condition at ATR support - potential reversal')
+alertcondition(mean_reversion_short, title = 'Mean Reversion Short Setup', message = 'Overbought condition at ATR resistance - potential reversal') 
