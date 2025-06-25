@@ -115,7 +115,3 @@ Lower Level = Moving Average - (ATR × Multiplier)
 3. **Color Schemes**:
    - Modify colors to match your chart theme
    - Use transparency for subtle level indication
-
-## Support and Updates
-
-This indicator provides a solid foundation for ATR-based analysis. Feel free to modify the code to suit your specific trading strategy and requirements. 
