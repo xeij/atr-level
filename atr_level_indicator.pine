@@ -1,0 +1,128 @@
+//@version=6
+indicator('Xeijs ATR Level Indicator', shorttitle = 'Xeijs ATR', overlay = true)
+
+// Input Parameters
+atr_length = input.int(14, title = 'ATR Length', minval = 1)
+ma_type = input.string('SMA', title = 'Moving Average Type', options = ['SMA', 'EMA', 'WMA', 'RMA'])
+ma_length = input.int(20, title = 'Moving Average Length', minval = 1)
+
+// ATR Multipliers for different levels
+atr_mult_1 = input.float(0.5, title = 'ATR Multiplier 1', minval = 0.1, step = 0.1)
+atr_mult_2 = input.float(1.0, title = 'ATR Multiplier 2', minval = 0.1, step = 0.1)
+atr_mult_3 = input.float(1.5, title = 'ATR Multiplier 3', minval = 0.1, step = 0.1)
+atr_mult_4 = input.float(2.0, title = 'ATR Multiplier 4', minval = 0.1, step = 0.1)
+
+// Visual Settings
+show_ma = input.bool(true, title = 'Show Moving Average')
+show_levels = input.bool(true, title = 'Show ATR Levels')
+show_labels = input.bool(true, title = 'Show Level Labels')
+
+// Colors
+ma_color = input.color(color.blue, title = 'Moving Average Color')
+upper_color_1 = input.color(color.new(color.red, 70), title = 'Upper Level 1 Color')
+upper_color_2 = input.color(color.new(color.red, 50), title = 'Upper Level 2 Color')
+upper_color_3 = input.color(color.new(color.red, 30), title = 'Upper Level 3 Color')
+upper_color_4 = input.color(color.new(color.red, 10), title = 'Upper Level 4 Color')
+lower_color_1 = input.color(color.new(color.green, 70), title = 'Lower Level 1 Color')
+lower_color_2 = input.color(color.new(color.green, 50), title = 'Lower Level 2 Color')
+lower_color_3 = input.color(color.new(color.green, 30), title = 'Lower Level 3 Color')
+lower_color_4 = input.color(color.new(color.green, 10), title = 'Lower Level 4 Color')
+
+// Calculate ATR
+atr = ta.atr(atr_length)
+
+// Calculate Moving Average
+ma = switch ma_type
+    'SMA' => ta.sma(close, ma_length)
+    'EMA' => ta.ema(close, ma_length)
+    'WMA' => ta.wma(close, ma_length)
+    'RMA' => ta.rma(close, ma_length)
+
+// Calculate ATR Levels
+upper_1 = ma + atr * atr_mult_1
+upper_2 = ma + atr * atr_mult_2
+upper_3 = ma + atr * atr_mult_3
+upper_4 = ma + atr * atr_mult_4
+
+lower_1 = ma - atr * atr_mult_1
+lower_2 = ma - atr * atr_mult_2
+lower_3 = ma - atr * atr_mult_3
+lower_4 = ma - atr * atr_mult_4
+
+// Plot Moving Average
+plot(show_ma ? ma : na, title = 'Moving Average', color = ma_color, linewidth = 2)
+
+// Plot ATR Levels
+plot(show_levels ? upper_1 : na, title = 'Upper ATR 1', color = upper_color_1, linewidth = 1)
+plot(show_levels ? upper_2 : na, title = 'Upper ATR 2', color = upper_color_2, linewidth = 1)
+plot(show_levels ? upper_3 : na, title = 'Upper ATR 3', color = upper_color_3, linewidth = 1)
+plot(show_levels ? upper_4 : na, title = 'Upper ATR 4', color = upper_color_4, linewidth = 1)
+
+plot(show_levels ? lower_1 : na, title = 'Lower ATR 1', color = lower_color_1, linewidth = 1)
+plot(show_levels ? lower_2 : na, title = 'Lower ATR 2', color = lower_color_2, linewidth = 1)
+plot(show_levels ? lower_3 : na, title = 'Lower ATR 3', color = lower_color_3, linewidth = 1)
+plot(show_levels ? lower_4 : na, title = 'Lower ATR 4', color = lower_color_4, linewidth = 1)
+
+// Add labels for the most recent bar
+if show_labels and barstate.islast
+    label.new(bar_index, upper_4, text = 'R4 (' + str.tostring(atr_mult_4) + 'x)', style = label.style_label_left, color = color.new(color.red, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, upper_3, text = 'R3 (' + str.tostring(atr_mult_3) + 'x)', style = label.style_label_left, color = color.new(color.red, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, upper_2, text = 'R2 (' + str.tostring(atr_mult_2) + 'x)', style = label.style_label_left, color = color.new(color.red, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, upper_1, text = 'R1 (' + str.tostring(atr_mult_1) + 'x)', style = label.style_label_left, color = color.new(color.red, 80), textcolor = color.white, size = size.small)
+
+    label.new(bar_index, ma, text = 'MA', style = label.style_label_left, color = color.new(color.blue, 80), textcolor = color.white, size = size.small)
+
+    label.new(bar_index, lower_1, text = 'S1 (' + str.tostring(atr_mult_1) + 'x)', style = label.style_label_left, color = color.new(color.green, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, lower_2, text = 'S2 (' + str.tostring(atr_mult_2) + 'x)', style = label.style_label_left, color = color.new(color.green, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, lower_3, text = 'S3 (' + str.tostring(atr_mult_3) + 'x)', style = label.style_label_left, color = color.new(color.green, 80), textcolor = color.white, size = size.small)
+    label.new(bar_index, lower_4, text = 'S4 (' + str.tostring(atr_mult_4) + 'x)', style = label.style_label_left, color = color.new(color.green, 80), textcolor = color.white, size = size.small)
+
+// Background fill between levels (optional)
+fill_between_levels = input.bool(false, title = 'Fill Between Levels')
+
+// Create separate plots for fill functionality
+upper_1_fill = plot(fill_between_levels ? upper_1 : na, title = 'Upper 1 Fill', display = display.none)
+upper_2_fill = plot(fill_between_levels ? upper_2 : na, title = 'Upper 2 Fill', display = display.none)
+upper_3_fill = plot(fill_between_levels ? upper_3 : na, title = 'Upper 3 Fill', display = display.none)
+upper_4_fill = plot(fill_between_levels ? upper_4 : na, title = 'Upper 4 Fill', display = display.none)
+
+lower_1_fill = plot(fill_between_levels ? lower_1 : na, title = 'Lower 1 Fill', display = display.none)
+lower_2_fill = plot(fill_between_levels ? lower_2 : na, title = 'Lower 2 Fill', display = display.none)
+lower_3_fill = plot(fill_between_levels ? lower_3 : na, title = 'Lower 3 Fill', display = display.none)
+lower_4_fill = plot(fill_between_levels ? lower_4 : na, title = 'Lower 4 Fill', display = display.none)
+
+// Add fills between levels
+fill(upper_1_fill, upper_2_fill, color = color.new(color.red, 95), title = 'Upper Fill 1-2')
+fill(upper_2_fill, upper_3_fill, color = color.new(color.red, 90), title = 'Upper Fill 2-3')
+fill(upper_3_fill, upper_4_fill, color = color.new(color.red, 85), title = 'Upper Fill 3-4')
+
+fill(lower_1_fill, lower_2_fill, color = color.new(color.green, 95), title = 'Lower Fill 1-2')
+fill(lower_2_fill, lower_3_fill, color = color.new(color.green, 90), title = 'Lower Fill 2-3')
+fill(lower_3_fill, lower_4_fill, color = color.new(color.green, 85), title = 'Lower Fill 3-4')
+
+// Calculate volatility for table (extract ta.sma calls to global scope)
+atr_avg = ta.sma(atr, 20)
+volatility_state = atr > atr_avg ? 'High' : 'Low'
+volatility_color = atr > atr_avg ? color.red : color.green
+
+// Table to display current ATR value and levels
+if barstate.islast and input.bool(true, title = 'Show ATR Info Table')
+    var table info_table = table.new(position.top_right, 2, 6, bgcolor = color.white, border_width = 1)
+    table.cell(info_table, 0, 0, 'ATR Info', text_color = color.black, bgcolor = color.gray)
+    table.cell(info_table, 1, 0, '', text_color = color.black, bgcolor = color.gray)
+    table.cell(info_table, 0, 1, 'ATR Value', text_color = color.black)
+    table.cell(info_table, 1, 1, str.tostring(atr, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 2, 'ATR %', text_color = color.black)
+    table.cell(info_table, 1, 2, str.tostring(atr / close * 100, '#.##') + '%', text_color = color.black)
+    table.cell(info_table, 0, 3, 'Current Price', text_color = color.black)
+    table.cell(info_table, 1, 3, str.tostring(close, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 4, 'MA Value', text_color = color.black)
+    table.cell(info_table, 1, 4, str.tostring(ma, '#.##'), text_color = color.black)
+    table.cell(info_table, 0, 5, 'Volatility', text_color = color.black)
+    table.cell(info_table, 1, 5, volatility_state, text_color = volatility_color)
+
+// Alert conditions
+alertcondition(ta.crossover(close, upper_1), title = 'Price Above ATR Upper 1', message = 'Price crossed above ATR Upper Level 1')
+alertcondition(ta.crossunder(close, lower_1), title = 'Price Below ATR Lower 1', message = 'Price crossed below ATR Lower Level 1')
+alertcondition(ta.crossover(close, upper_2), title = 'Price Above ATR Upper 2', message = 'Price crossed above ATR Upper Level 2')
+alertcondition(ta.crossunder(close, lower_2), title = 'Price Below ATR Lower 2', message = 'Price crossed below ATR Lower Level 2')
